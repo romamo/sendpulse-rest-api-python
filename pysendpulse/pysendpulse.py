@@ -37,6 +37,7 @@ class PySendPulse:
     __api_url = "https://api.sendpulse.com"
     __user_id = None
     __secret = None
+    __api_key = None
     __token = None
     __token_file_path = ""
     __token_hash_name = None
@@ -47,16 +48,26 @@ class PySendPulse:
     MEMCACHED_VALUE_TIMEOUT = 3600
     ALLOWED_STORAGE_TYPES = ['FILE', 'MEMCACHED']
 
-    def __init__(self, user_id, secret, storage_type="FILE", token_file_path="", memcached_host="127.0.0.1:11211"):
+    def __init__(self, user_id=None, secret=None, storage_type="FILE", token_file_path="", memcached_host="127.0.0.1:11211", api_key=None):
         """ SendPulse API constructor
 
         @param user_id: string REST API ID from SendPulse settings
         @param secret: string REST API Secret from SendPulse settings
         @param storage_type: string FILE|MEMCACHED
         @param memcached_host: string Host for Memcached server, default is 127.0.0.1:11211
+        @param api_key: string API key from SendPulse settings, used instead of ID and SECRET
         @raise: Exception empty credentials or get token failed
         """
         logger.info("Initialization SendPulse REST API Class")
+        if api_key is not None:
+            if not api_key:
+                raise Exception("Empty API key")
+            if user_id or secret:
+                raise Exception("Pass either API key or ID and SECRET, not both")
+            self.__api_key = api_key
+            self.__token = api_key
+            return
+
         if not user_id or not secret:
             raise Exception("Empty ID or SECRET")
 
@@ -157,7 +168,7 @@ class PySendPulse:
             response = requests.delete(url, headers=headers, data=params)
         else:
             response = requests.get(url, headers=headers, params=params)
-        if response.status_code == 401 and self.__refresh_token == 0:
+        if response.status_code == 401 and self.__api_key is None and self.__refresh_token == 0:
             self.__get_token()
             return self.__send_request(path, method, json.loads(params) if params and isinstance(params, str) else params)
         elif response.status_code == 404:
